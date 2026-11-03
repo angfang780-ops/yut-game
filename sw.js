@@ -1,5 +1,5 @@
 // 오프라인에서도 열리도록 앱 파일을 저장해 두고, 인터넷이 되면 새 버전으로 갱신한다.
-const CACHE = 'yut-game-v3';
+const CACHE = 'yut-game-v5';
 const FILES = ['./', './index.html', './app.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
 
 self.addEventListener('install', e => {
