@@ -2,7 +2,7 @@
   "name": "윷놀이",
   "short_name": "윷놀이",
   "lang": "ko",
-  "id": "/yut-game/",
+  "id": "/yut-game/app2",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",
