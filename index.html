@@ -76,6 +76,8 @@
   .stick.flat::before{top:30%}
   .stick.flat::after{top:30%;transform:translateX(-50%) rotate(-45deg)}
   .stick.spin{transform:rotateX(180deg)}
+  /* 백도 윷가락: 엎어진 면의 표시가 빨강 */
+  .stick.bk.flat::before,.stick.bk.flat::after,.fx .ys.bk.flat::before,.fx .ys.bk.flat::after{background:#D32F2F;height:4px}
   /* 윷판 위 큰 윷 던지기 */
   .fx{position:absolute;left:0;top:0;bottom:0;right:var(--pw);display:grid;place-items:center;pointer-events:none;z-index:2;perspective:900px;background:rgba(8,12,20,.25)}
   .fx .ys{
@@ -121,7 +123,7 @@
     <aside class="panel" id="panel">
       <button id="gear" class="btn gear" type="button">설정</button>
       <div class="turn me" id="turn">어머니 차례</div>
-      <div class="sticks" id="sticks"><span class="stick"></span><span class="stick"></span><span class="stick"></span><span class="stick"></span></div>
+      <div class="sticks" id="sticks"><span class="stick bk"></span><span class="stick"></span><span class="stick"></span><span class="stick"></span></div>
       <div class="result" id="result"></div>
       <div class="say" id="say">「윷 던지기」를 눌러요</div>
       <button id="throw" class="btn primary throw" type="button">윷 던지기</button>
@@ -145,7 +147,7 @@
           <button id="again" class="btn" type="button">처음부터</button>
           <button id="full" class="btn wide" type="button">전체 화면</button>
         </div>
-        <p class="note">윷을 던진 뒤 움직일 말을 누르면 노란 점까지 가요. 윷·모가 나오거나 상대 말을 잡으면 한 번 더 던져요. 말이 다 나가면 이겨요.</p>
+        <p class="note">윷을 던진 뒤 움직일 말을 누르면 노란 점까지 가요. 윷·모가 나오거나 상대 말을 잡으면 한 번 더 던져요. 말이 다 나가면 이겨요. 빨간 표시가 있는 윷가락 하나만 엎어지면 백도 — 판 위의 말이 한 칸 뒤로 가요(판 위에 말이 없으면 넘어가요).</p>
         <button id="menuClose" class="btn primary" type="button">닫고 하기</button>
       </div>
     </div>
@@ -166,6 +168,7 @@
   const turned = matchMedia('(orientation: portrait)');
   const PREFS = 'yut.prefs';
   const NAMES = ['', '도', '개', '걸', '윷', '모'];
+  const nameOf = k => k < 0 ? '백도' : NAMES[k]; // 백도: 표시한 윷가락 하나만 엎어지면 한 칸 뒤로
 
   // ---------- 윷판 ----------
   // 바깥 20칸: 출발(오른쪽 아래)에서 위로 → 왼쪽 → 아래로 → 오른쪽으로 돌아온다. 지름길 a(오른쪽 위→왼쪽 아래), b(왼쪽 위→출발)
@@ -187,6 +190,7 @@
   const outerFrom = n => { const r = []; for (let i = n; i <= 19; i++) r.push('o' + i); return r.concat('OUT'); };
   function route(node){
     if (node === 'home') return outerFrom(1);
+    if (node === 'S') return ['OUT']; // 백도로 출발점에 돌아온 말은 다음에 움직이면 나간다
     if (node === 'o5') return ['a1', 'a2', 'c', 'a3', 'a4'].concat(outerFrom(15));
     if (node === 'o10') return ['b1', 'b2', 'c', 'b3', 'b4', 'OUT'];
     if (node === 'c') return ['b3', 'b4', 'OUT'];
@@ -202,6 +206,9 @@
   }
   // k칸 갈 때 지나는 칸들 (마지막이 도착 칸, 'OUT'이면 나감)
   function path(node, k){ const r = route(node); return r.slice(0, Math.min(k, r.length)); }
+  // 백도: 한 칸 뒤 (가운데에서는 오른쪽 위에서 온 길로, 출발점에서는 바깥 마지막 칸으로)
+  const BACK = { o1: 'S', S: 'o19', a1: 'o5', a2: 'a1', c: 'a2', a3: 'c', a4: 'a3', b1: 'o10', b2: 'b1', b3: 'c', b4: 'b3' };
+  const backOf = n => BACK[n] || 'o' + (+n.slice(1) - 1);
 
   // ---------- 게임 상태 ----------
   let prefs = { count: 2, sound: true };
@@ -228,9 +235,10 @@
     const seen = new Set(), out = [];
     G.pcs[who].forEach((p, i) => {
       if (p === 'out' || seen.has(p)) return;
+      if (k < 0 && p === 'home') return; // 백도는 판 위에 있는 말만
       seen.add(p);
       const idx = G.pcs[who].map((q, j) => q === p ? j : -1).filter(j => j >= 0);
-      const steps = path(p, k);
+      const steps = k < 0 ? [backOf(p)] : path(p, k);
       out.push({ from: p, idx: p === 'home' ? [idx[0]] : idx, steps, to: steps[steps.length - 1] });
     });
     return out;
@@ -241,7 +249,8 @@
   function rollSticks(){
     const flats = [0, 1, 2, 3].map(() => Math.random() < .6);
     const n = flats.filter(Boolean).length;
-    return { flats, k: n === 0 ? 5 : n };
+    // 첫 번째 윷가락(빨간 표시)만 엎어지면 백도
+    return { flats, k: n === 0 ? 5 : n === 1 && flats[0] ? -1 : n };
   }
   function setSticks(flats, spin){
     [...$('#sticks').children].forEach((s, i) => {
@@ -256,15 +265,21 @@
     $('#throw').disabled = true;
     $('#result').textContent = '';
     const r = rollSticks();
-    throwFx(r.flats, NAMES[r.k]).then(() => {
+    throwFx(r.flats, nameOf(r.k)).then(() => {
       setSticks(r.flats, false);
       G.roll = r.k;
-      $('#result').textContent = NAMES[r.k] + '!';
-      beep(r.k >= 4 ? 880 : 620, .15);
+      $('#result').textContent = nameOf(r.k) + '!';
+      beep(r.k >= 4 ? 880 : r.k < 0 ? 300 : 620, .15);
       G.phase = 'move';
       const ops = options(G.turn, r.k);
+      if (!ops.length){ // 백도인데 판 위에 말이 없으면 그냥 넘어간다
+        G.turn = other(G.turn); G.phase = 'throw'; G.ops = null; draw();
+        syncPanel(G.turn === 'me' ? '컴퓨터는 백도라 움직일 말이 없어요. 「윷 던지기」를 눌러요' : '백도! 판 위에 말이 없어서 넘어가요');
+        if (G.turn === 'cpu') setTimeout(doThrow, 1400);
+        return;
+      }
       if (G.turn === 'me'){
-        syncPanel(r.k >= 4 ? `${NAMES[r.k]}! 말을 옮기고 한 번 더 던져요` : '움직일 말을 눌러요');
+        syncPanel(r.k >= 4 ? `${nameOf(r.k)}! 말을 옮기고 한 번 더 던져요` : r.k < 0 ? '백도! 한 칸 뒤로 갈 말을 눌러요' : '움직일 말을 눌러요');
         G.ops = ops; draw();
       } else {
         G.ops = ops; draw();
@@ -281,7 +296,7 @@
       fx.style.setProperty('--sw', sw + 'px');
       const still = matchMedia('(prefers-reduced-motion: reduce)').matches, dur = still ? 300 : 1100;
       const sticks = flats.map((flat, i) => {
-        const el = document.createElement('div'); el.className = 'ys';
+        const el = document.createElement('div'); el.className = 'ys' + (i === 0 ? ' bk' : '');
         fx.appendChild(el);
         const x = (i - 1.5)*sw*2.5 + (Math.random() - .5)*sw*.6, rot = (Math.random() - .5)*24;
         const spin = (Math.random() < .5 ? -1 : 1)*(2 + Math.floor(Math.random()*2))*360; // 몇 바퀴 돌고 거의 똑바로 선다
